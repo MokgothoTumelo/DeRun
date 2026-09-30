@@ -1,0 +1,48 @@
+DE LEGACY / DE RUN — FIREBASE CONNECTION SETUP
+
+The two pages now use the same Firestore collection:
+    registrations
+
+FLOW
+1. A visitor submits index.html.
+2. index.html saves the registration to Firestore /registrations.
+3. admin.html listens to that same collection in real time.
+4. The new registration appears on the dashboard without refreshing.
+
+IMPORTANT: Put the SAME Firebase Web App config in BOTH index.html and admin.html.
+Replace:
+    PASTE_API_KEY
+    PASTE_AUTH_DOMAIN
+    PASTE_PROJECT_ID
+    PASTE_APP_ID
+
+Firebase Console steps:
+1. Create/open your Firebase project.
+2. Add a Web App under Project settings > Your apps.
+3. Copy its config into both files.
+4. Enable Firestore Database.
+5. Enable Authentication > Sign-in method > Email/Password.
+6. Create the admin account under Authentication > Users using:
+       Lebogangraseona576@gmail.com
+   This is the only account authorised to access the dashboard.
+7. Publish firestore.rules. It already restricts READ access to that exact email address.
+
+SECURITY
+- Public users can CREATE registrations only.
+- Only the organiser emails listed in firestore.rules can READ registrations.
+- Public users cannot update/delete registrations.
+- The admin page requires Firebase Authentication.
+
+IMPORTANT
+Do not use a fake/placeholder Firebase config. Until the real config is added,
+index.html cannot save registrations and admin.html cannot read them.
+
+ADMIN ACCOUNT
+The admin dashboard is restricted in two places:
+- admin.html checks that the signed-in email is Lebogangraseona576@gmail.com.
+- firestore.rules only allows that exact authenticated email to read registrations.
+
+Create the user with Email/Password in Firebase Authentication and use that account's password on admin.html.
+
+
+IMPORTANT: If admin login succeeds but the dashboard says Firebase denied access, the Firebase Authentication user is working. Go to Firebase Console > Firestore Database > Rules, replace the deployed rules with the firestore.rules file included in this ZIP, and click Publish. Then refresh admin.html. The deployed Firestore rules are separate from the local file in the ZIP; changing the ZIP does not publish rules to Firebase automatically.
