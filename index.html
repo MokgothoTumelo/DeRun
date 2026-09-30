@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>De Legacy ZA | DE RUN Signup</title>
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <style>
     :root {
       --blue: #0072DB;
@@ -859,6 +861,27 @@
       section.style.display = 'block';
     })();
 
+    // ===== FIREBASE (same config as admin.html) =====
+    const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyCtYlTQoVojE0JQd88knc1285tftI9ACOw',
+    authDomain: 'de-legacy.firebaseapp.com',
+    projectId: 'de-legacy',
+    storageBucket: 'de-legacy.firebasestorage.app',
+    messagingSenderId: '809510924060',
+    appId: '1:809510924060:web:72a0c4929edc2c282e54d9'
+  };
+    let db = null;
+    try {
+      if (FIREBASE_CONFIG.apiKey.startsWith('PASTE')) {
+        console.warn('Firebase is not configured. Add the same Firebase config to index.html and admin.html.');
+      } else {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        db = firebase.firestore();
+      }
+    } catch (e) {
+      console.error('Firebase init error:', e);
+    }
+
     const form = document.getElementById('signupForm');
     const messageBox = document.getElementById('formMessage');
     const submitBtn = document.getElementById('submitBtn');
@@ -902,15 +925,40 @@
       };
 
       try {
-        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, formData);
+        // Firestore is the source of truth for the organiser dashboard.
+        // A registration is only considered successful after it is saved here.
+        if (!db) {
+          throw new Error('Firebase is not configured.');
+        }
+
+        await db.collection('registrations').add({
+          fullName: formData.fullName,
+          phone: formData.phone,
+          email: formData.email,
+          gender: formData.gender,
+          city: formData.city,
+          interest: formData.interest,
+          message: formData.message,
+          campaign: formData.campaign,
+          marketingConsent: true,
+          submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Email notification is optional; a failed email must not remove
+        // the registration that was already saved to Firestore.
+        try {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, formData);
+        } catch (emailErr) {
+          console.error('EmailJS notification failed:', emailErr);
+        }
 
         formSection.style.display = 'none';
         announcementSection.style.display = 'none';
         successSection.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
-        console.error('EmailJS error:', err);
-        showMessage('Something went wrong. Please try again.', 'error');
+        console.error('Registration error:', err);
+        showMessage('Registration could not be saved. Please check your connection and try again.', 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
       }
