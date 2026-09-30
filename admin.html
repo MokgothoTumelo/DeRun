@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>DE RUN | Organiser Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    :root { --blue:#0072DB; --pink:#F320BA; --black:#0a0a0a; --muted:#555; --border:#e5e5e5; --error:#dc2626; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:#f6f6f6; color:#111; line-height:1.5; min-height:100dvh; }
+    .brand-bar { height:5px; background:linear-gradient(90deg,var(--blue) 45%,var(--pink) 55%); }
+    header { background:var(--black); color:#fff; padding:1rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
+    header h1 { font-size:1.1rem; font-weight:900; text-transform:uppercase; letter-spacing:-.01em; }
+    header small { display:block; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; opacity:.7; font-weight:500; }
+    button, .btn { font:inherit; cursor:pointer; border:none; border-radius:10px; padding:.7rem 1rem; font-weight:700; min-height:44px; background:var(--black); color:#fff; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    header button { background:#222; }
+    .btn-light { background:#fff; color:var(--black); border:1.5px solid var(--border); }
+    .wrap { max-width:1100px; margin:0 auto; padding:1rem; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:1.4rem 1.25rem; box-shadow:0 6px 24px rgba(0,0,0,.06); }
+    #loginView { max-width:420px; margin:2.5rem auto; }
+    #loginView h2 { margin-bottom:1rem; }
+    label { display:block; font-size:.78rem; font-weight:700; margin:.9rem 0 .3rem; text-transform:uppercase; letter-spacing:.03em; }
+    input, select { width:100%; padding:.8rem .95rem; border:1.5px solid var(--border); border-radius:10px; font-size:1rem; font-family:inherit; background:#fff; }
+    input:focus, select:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,114,219,.18); }
+    #loginView button { width:100%; margin-top:1.1rem; }
+    .error { color:var(--error); background:#fee2e2; border:1px solid #fecaca; padding:.7rem; border-radius:10px; margin-top:1rem; font-size:.9rem; display:none; }
+    #dashView { display:none; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.75rem; margin-bottom:1rem; }
+    .stat { background:#fff; border:1px solid var(--border); border-radius:12px; padding:.9rem 1rem; border-top:3px solid var(--blue); }
+    .stat:nth-child(even) { border-top-color:var(--pink); }
+    .stat b { display:block; font-size:1.6rem; line-height:1.1; }
+    .stat span { font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+    .tools { display:grid; grid-template-columns:1fr; gap:.6rem; margin-bottom:1rem; }
+    @media (min-width:700px) { .tools { grid-template-columns:2fr 1fr 1fr auto; } }
+    table { width:100%; border-collapse:collapse; font-size:.9rem; }
+    th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:.6rem .5rem; border-bottom:2px solid var(--border); white-space:nowrap; }
+    td { padding:.7rem .5rem; border-bottom:1px solid var(--border); vertical-align:top; }
+    .table-scroll { overflow-x:auto; background:#fff; border:1px solid var(--border); border-radius:14px; padding:.5rem; }
+    .wa { color:var(--blue); font-weight:700; text-decoration:none; }
+    .msg { max-width:240px; color:var(--muted); }
+    .empty { text-align:center; padding:2rem 1rem; color:var(--muted); }
+    @media (max-width:699px) {
+      .table-scroll { background:none; border:none; padding:0; overflow:visible; }
+      table, tbody, tr, td { display:block; width:100%; }
+      thead { display:none; }
+      tr { background:#fff; border:1px solid var(--border); border-radius:12px; padding:.75rem .9rem; margin-bottom:.75rem; }
+      td { border:none; padding:.2rem 0; }
+      td[data-l]::before { content:attr(data-l) ": "; font-weight:700; font-size:.72rem; text-transform:uppercase; color:var(--muted); letter-spacing:.04em; }
+      td.name { font-size:1.05rem; font-weight:800; }
+      td.name::before { content:""; }
+      .msg { max-width:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="brand-bar"></div>
+  <header>
+    <div><h1>DE RUN <small>Organiser dashboard</small></h1></div>
+    <button id="logoutBtn" style="display:none">Log out</button>
+  </header>
+
+  <div class="wrap">
+    <!-- Login -->
+    <div class="card" id="loginView">
+      <h2>Organiser login</h2>
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="email" />
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" />
+      <div class="error" id="loginError"></div>
+      <button id="loginBtn">Log in</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashView">
+      <div class="stats">
+        <div class="stat"><b id="sTotal">0</b><span>Total signups</span></div>
+        <div class="stat"><b id="sFemale">0</b><span>Female</span></div>
+        <div class="stat"><b id="sMale">0</b><span>Male</span></div>
+        <div class="stat"><b id="sJoin">0</b><span>Want to join</span></div>
+      </div>
+
+      <div class="tools">
+        <input type="search" id="search" placeholder="Search name, phone, email, city…" />
+        <select id="fGender">
+          <option value="">All genders</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+        </select>
+        <select id="fInterest">
+          <option value="">All interests</option>
+          <option value="join">Joining DE RUN</option>
+          <option value="info">More information</option>
+        </select>
+        <button id="csvBtn" class="btn-light">Export CSV</button>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Gender</th><th>City</th><th>Interest</th><th>Message</th><th>Signed up</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" style="display:none">No signups yet.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ===== USE THE EXACT SAME FIREBASE CONFIG AS index.html =====
+  // Firebase Console > Project settings > Your apps > Web app
+  const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyCtYlTQoVojE0JQd88knc1285tftI9ACOw',
+    authDomain: 'de-legacy.firebaseapp.com',
+    projectId: 'de-legacy',
+    storageBucket: 'de-legacy.firebasestorage.app',
+    messagingSenderId: '809510924060',
+    appId: '1:809510924060:web:72a0c4929edc2c282e54d9'
+  };
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const ADMIN_EMAIL = 'Lebogangraseona576@gmail.com';
+
+  const $ = id => document.getElementById(id);
+  let all = [];
+  let unsubscribe = null;
+
+  const interestLabel = { join: 'Joining DE RUN', info: 'More information' };
+  const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+
+  function toWaLink(phone) {
+    let d = String(phone || '').replace(/\D/g, '');
+    if (d.startsWith('0')) d = '27' + d.slice(1); // South African numbers
+    return 'https://wa.me/' + d;
+  }
+
+  function fmtDate(ts) {
+    if (!ts || !ts.toDate) return '';
+    return ts.toDate().toLocaleString('en-ZA', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  // Login
+  $('loginBtn').addEventListener('click', login);
+  $('password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+  async function login() {
+    $('loginError').style.display = 'none';
+    $('loginBtn').disabled = true;
+    try {
+      await auth.signInWithEmailAndPassword($('email').value.trim(), $('password').value);
+    } catch (err) {
+      $('loginError').textContent = 'Login failed. Check your email and password.';
+      $('loginError').style.display = 'block';
+    }
+    $('loginBtn').disabled = false;
+  }
+  $('logoutBtn').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      // This account is the only account allowed to use the admin dashboard.
+      if ((user.email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        await auth.signOut();
+        $('loginError').textContent = 'This account is not authorised as an administrator.';
+        $('loginError').style.display = 'block';
+        return;
+      }
+
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+      $('loginView').style.display = 'none';
+      $('dashView').style.display = 'block';
+      $('logoutBtn').style.display = 'inline-flex';
+      unsubscribe = db.collection('registrations').orderBy('submittedAt', 'desc').onSnapshot(snap => {
+        all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      }, err => {
+        console.error(err);
+        $('rows').innerHTML = '';
+        $('empty').style.display = 'block';
+        if (err && err.code === 'permission-denied') {
+          $('empty').textContent = 'Firebase denied access. Signed in as: ' + ((auth.currentUser && auth.currentUser.email) || '(no email)') + '. Make sure the Firestore Rules for project de-legacy allow this email, then Publish.';
+        } else {
+          $('empty').textContent = 'Could not load registrations: ' + (err && err.message ? err.message : 'Unknown Firebase error');
+        }
+      });
+    } else {
+      if (unsubscribe) unsubscribe();
+      all = [];
+      $('loginView').style.display = 'block';
+      $('dashView').style.display = 'none';
+      $('logoutBtn').style.display = 'none';
+    }
+  });
+
+  function filtered() {
+    const q = $('search').value.trim().toLowerCase();
+    const g = $('fGender').value;
+    const i = $('fInterest').value;
+    return all.filter(r =>
+      (!g || r.gender === g) &&
+      (!i || r.interest === i) &&
+      (!q || [r.fullName, r.phone, r.email, r.city].join(' ').toLowerCase().includes(q))
+    );
+  }
+
+  function cell(text, cls, label) {
+    const td = document.createElement('td');
+    if (cls) td.className = cls;
+    if (label) td.setAttribute('data-l', label);
+    td.textContent = text || '—';
+    return td;
+  }
+
+  function render() {
+    $('sTotal').textContent = all.length;
+    $('sFemale').textContent = all.filter(r => r.gender === 'female').length;
+    $('sMale').textContent = all.filter(r => r.gender === 'male').length;
+    $('sJoin').textContent = all.filter(r => r.interest === 'join').length;
+
+    const list = filtered();
+    const tbody = $('rows');
+    tbody.innerHTML = '';
+    $('empty').style.display = list.length ? 'none' : 'block';
+    $('empty').textContent = all.length ? 'No signups match your search.' : 'No signups yet.';
+
+    list.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.appendChild(cell(r.fullName, 'name'));
+      const tdP = document.createElement('td');
+      tdP.setAttribute('data-l', 'Phone');
+      const a = document.createElement('a');
+      a.className = 'wa'; a.href = toWaLink(r.phone); a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = r.phone || '—';
+      tdP.appendChild(a);
+      tr.appendChild(tdP);
+      tr.appendChild(cell(r.email, '', 'Email'));
+      tr.appendChild(cell(cap(r.gender === 'Not specified' ? '' : r.gender), '', 'Gender'));
+      tr.appendChild(cell(r.city === 'Not specified' ? '' : r.city, '', 'City'));
+      tr.appendChild(cell(interestLabel[r.interest] || '', '', 'Interest'));
+      tr.appendChild(cell(r.message === '—' ? '' : r.message, 'msg', 'Message'));
+      tr.appendChild(cell(fmtDate(r.submittedAt), '', 'Signed up'));
+      tbody.appendChild(tr);
+    });
+  }
+  ['search', 'fGender', 'fInterest'].forEach(id => $(id).addEventListener('input', render));
+
+  // CSV export (guards against spreadsheet formula injection)
+  $('csvBtn').addEventListener('click', () => {
+    const esc = v => {
+      let t = String(v ?? '');
+      if (/^[=+\-@]/.test(t)) t = "'" + t;
+      return '"' + t.replace(/"/g, '""') + '"';
+    };
+    const head = ['Name','Phone','Email','Gender','City','Interest','Message','Signed up'];
+    const lines = [head.map(esc).join(',')];
+    filtered().forEach(r => lines.push([r.fullName, r.phone, r.email, r.gender, r.city, interestLabel[r.interest] || r.interest, r.message, fmtDate(r.submittedAt)].map(esc).join(',')));
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'de-run-signups.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+</script>
+</body>
+</html>
