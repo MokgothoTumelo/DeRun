@@ -1,13 +1,19 @@
 DE LEGACY / DE RUN — FIREBASE CONNECTION SETUP
 
-The two pages now use the same Firestore collection:
+The two pages use these Firestore collections:
     registrations
+    eventAttendance
+    partnerships
 
 FLOW
 1. A visitor submits index.html.
-2. index.html saves the registration to Firestore /registrations.
-3. admin.html listens to that same collection in real time.
-4. The new registration appears on the dashboard without refreshing.
+2. The visitor chooses either “Join DE RUN” or “Partner with us”.
+3. “Join DE RUN” opens the existing participant registration form and saves to /registrations.
+4. “Partner with us” opens the partnership enquiry form and saves to /partnerships.
+5. admin.html listens to both collections in real time and shows each in its own dashboard tab.
+6. The admin reviews partnership enquiries by setting a status and saving private follow-up notes.
+7. The admin records check-ins in eventAttendance, one record per person per Saturday date.
+8. The participant dashboard shows the selected Saturday's attendance and each person's total attended Saturdays.
 
 IMPORTANT: Put the SAME Firebase Web App config in BOTH index.html and admin.html.
 Replace:
@@ -25,11 +31,18 @@ Firebase Console steps:
 6. Create the admin account under Authentication > Users using:
        Lebogangraseona576@gmail.com
    This is the only account authorised to access the dashboard.
-7. Publish firestore.rules. It already restricts READ access to that exact email address.
+7. Publish firestore.rules. It allows public participant registrations and partnership enquiries,
+   restricts all records to the authorised admin for reading, lets that admin record attendance
+   without overwriting earlier Saturday records, and lets that admin update partnership review
+   status and follow-up notes.
 
 SECURITY
 - Public users can CREATE registrations only.
-- Only the organiser emails listed in firestore.rules can READ registrations.
+- Public users can CREATE partnership enquiries only; they cannot read enquiries or edit review details.
+- Only the organiser email listed in firestore.rules can READ registrations, attendance history,
+  and partnership enquiries.
+- Only the organiser email can create or update eventAttendance records; the public form cannot read them.
+- Only the organiser email can update partnership review status and private follow-up notes.
 - Public users cannot update/delete registrations.
 - The admin page requires Firebase Authentication.
 
@@ -40,9 +53,15 @@ index.html cannot save registrations and admin.html cannot read them.
 ADMIN ACCOUNT
 The admin dashboard is restricted in two places:
 - admin.html checks that the signed-in email is Lebogangraseona576@gmail.com.
-- firestore.rules only allows that exact authenticated email to read registrations.
+- firestore.rules only allows that exact authenticated email to read registrations, attendance,
+  and partnership enquiries, and to save partnership review details.
 
 Create the user with Email/Password in Firebase Authentication and use that account's password on admin.html.
 
 
-IMPORTANT: If admin login succeeds but the dashboard says Firebase denied access, the Firebase Authentication user is working. Go to Firebase Console > Firestore Database > Rules, replace the deployed rules with the firestore.rules file included in this ZIP, and click Publish. Then refresh admin.html. The deployed Firestore rules are separate from the local file in the ZIP; changing the ZIP does not publish rules to Firebase automatically.
+IMPORTANT: If admin login succeeds but registrations or attendance fail to load/save, check the deployed Firestore rules. Go to Firebase Console > Firestore Database > Rules, replace the deployed rules with this project's firestore.rules file, and click Publish. Then refresh admin.html. The deployed Firestore rules are separate from the local file; changing it does not publish rules to Firebase automatically.
+
+EVENT-DAY BACKUP
+- In the admin dashboard, select the Saturday event date and print the offline backup sheet before the event.
+- If the internet is unavailable, record each participant and their optional consent choices on paper, and mark attendance there.
+- When service returns, enter the registration online and mark attendance for that same Saturday date.
