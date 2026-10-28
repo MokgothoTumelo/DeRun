@@ -101,10 +101,14 @@
         <div class="stat"><b id="sFemale">0</b><span>Female</span></div>
         <div class="stat"><b id="sMale">0</b><span>Male</span></div>
         <div class="stat"><b id="sJoin">0</b><span>Want to join</span></div>
-        <div class="stat"><b id="sAttended">0</b><span>Checked in</span></div>
+        <div class="stat"><b id="sAttended">0</b><span>Checked in this Saturday</span></div>
       </div>
 
       <div class="tools">
+        <div>
+          <label for="eventDate">Saturday event date</label>
+          <input type="date" id="eventDate" />
+        </div>
         <input type="search" id="search" placeholder="Search name, phone, email, city…" />
         <select id="fGender">
           <option value="">All genders</option>
@@ -125,7 +129,7 @@
       <div class="table-scroll">
         <table>
           <thead>
-            <tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Gender</th><th>City</th><th>Interest</th><th>Photo consent</th><th>Marketing updates</th><th>Attendance</th><th>Message</th><th>Signed up</th></tr>
+            <tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Gender</th><th>City</th><th>Interest</th><th>Photo consent</th><th>Marketing updates</th><th>This Saturday</th><th>Total Saturdays</th><th>Message</th><th>Signed up</th></tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
@@ -134,6 +138,7 @@
 
       <section id="backupPrint" aria-hidden="true">
         <h1>DE RUN — Offline Registration &amp; Check-in</h1>
+        <p>Event date: <strong id="backupEventDate"></strong></p>
         <p>Use this sheet only if the online form is unavailable. Ask each person separately about photography and marketing; mark Yes only when they choose to opt in. Enter these registrations online when service is restored.</p>
         <table>
           <thead><tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Interest (join/info)</th><th>Photo consent (Y/N)</th><th>Marketing consent (Y/N)</th><th>Checked in</th></tr></thead>
@@ -162,11 +167,31 @@
 
   const $ = id => document.getElementById(id);
   let all = [];
-  let unsubscribe = null;
+  let allAttendance = [];
+  let unsubscribeRegistrations = null;
+  let unsubscribeAttendance = null;
 
   const interestLabel = { join: 'Joining DE RUN', info: 'More information' };
   const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
   const checkinError = $('checkinError');
+  const dateKey = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  function nextSaturday() {
+    const date = new Date();
+    const daysUntilSaturday = (6 - date.getDay() + 7) % 7;
+    date.setDate(date.getDate() + daysUntilSaturday);
+    return date;
+  }
+  $('eventDate').value = dateKey(nextSaturday());
+  const eventDateLabel = () => $('eventDate').value;
+  const isSaturdayDate = value => {
+    if (!value) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).getDay() === 6;
+  };
+  function showCheckinError(message) {
+    checkinError.textContent = message;
+    checkinError.style.display = 'block';
+  }
 
   function toWaLink(phone) {
     let d = String(phone || '').replace(/\D/g, '');
@@ -205,33 +230,52 @@
         return;
       }
 
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
+      $('eventDate').value = dateKey(nextSaturday());
+      if (!unsubscribeRegistrations) {
+        unsubscribeRegistrations = db.collection('registrations').orderBy('submittedAt', 'desc').onSnapshot(snap => {
+          all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          render();
+        }, err => {
+          console.error(err);
+          $('rows').innerHTML = '';
+          $('empty').style.display = 'block';
+          $('empty').textContent = err && err.code === 'permission-denied'
+            ? 'Firebase denied access. Check the Firestore rules for this admin account.'
+            : 'Could not load registrations.';
+        });
+      }
+      if (!unsubscribeAttendance) {
+        unsubscribeAttendance = db.collection('eventAttendance').onSnapshot(snap => {
+          allAttendance = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          render();
+        }, err => {
+          console.error(err);
+          showCheckinError('Could not load attendance history. Check the Firestore rules for this admin account.');
+        });
       }
       $('loginView').style.display = 'none';
       $('dashView').style.display = 'block';
       $('logoutBtn').style.display = 'inline-flex';
-      unsubscribe = db.collection('registrations').orderBy('submittedAt', 'desc').onSnapshot(snap => {
-        all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        render();
-      }, err => {
-        console.error(err);
-        $('rows').innerHTML = '';
-        $('empty').style.display = 'block';
-        if (err && err.code === 'permission-denied') {
-          $('empty').textContent = 'Firebase denied access. Signed in as: ' + ((auth.currentUser && auth.currentUser.email) || '(no email)') + '. Make sure the Firestore Rules for project de-legacy allow this email, then Publish.';
-        } else {
-          $('empty').textContent = 'Could not load registrations: ' + (err && err.message ? err.message : 'Unknown Firebase error');
-        }
-      });
     } else {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeRegistrations) unsubscribeRegistrations();
+      if (unsubscribeAttendance) unsubscribeAttendance();
+      unsubscribeRegistrations = null;
+      unsubscribeAttendance = null;
       all = [];
+      allAttendance = [];
       $('loginView').style.display = 'block';
       $('dashView').style.display = 'none';
       $('logoutBtn').style.display = 'none';
     }
+  });
+
+  $('eventDate').addEventListener('change', () => {
+    checkinError.style.display = 'none';
+    if (!isSaturdayDate(eventDateLabel())) {
+      showCheckinError('Choose a Saturday date for this DE RUN event.');
+      $('eventDate').value = dateKey(nextSaturday());
+    }
+    render();
   });
 
   function filtered() {
@@ -258,7 +302,15 @@
     $('sFemale').textContent = all.filter(r => r.gender === 'female').length;
     $('sMale').textContent = all.filter(r => r.gender === 'male').length;
     $('sJoin').textContent = all.filter(r => r.interest === 'join').length;
-    $('sAttended').textContent = all.filter(r => r.checkedIn === true).length;
+    const activeEventDate = eventDateLabel();
+    const attendanceForEvent = new Map();
+    const attendanceCounts = new Map();
+    allAttendance.forEach(record => {
+      if (record.checkedIn !== true || !record.registrationId) return;
+      attendanceCounts.set(record.registrationId, (attendanceCounts.get(record.registrationId) || 0) + 1);
+      if (record.eventDate === activeEventDate) attendanceForEvent.set(record.registrationId, record);
+    });
+    $('sAttended').textContent = attendanceForEvent.size;
 
     const list = filtered();
     const tbody = $('rows');
@@ -282,22 +334,27 @@
       tr.appendChild(cell(interestLabel[r.interest] || '', '', 'Interest'));
       tr.appendChild(cell(r.photoConsent === true ? 'Yes' : r.photoConsent === false ? 'No' : 'Not recorded', '', 'Photo consent'));
       tr.appendChild(cell(r.marketingConsent === true ? 'Yes' : r.marketingConsent === false ? 'No' : 'Not recorded', '', 'Marketing updates'));
+      const eventAttendance = attendanceForEvent.get(r.id);
+      const checkedInThisEvent = Boolean(eventAttendance);
       const tdAttendance = document.createElement('td');
-      tdAttendance.setAttribute('data-l', 'Attendance');
+      tdAttendance.setAttribute('data-l', 'This Saturday');
       const attendanceButton = document.createElement('button');
       attendanceButton.type = 'button';
       attendanceButton.className = 'checkin-toggle';
-      attendanceButton.textContent = r.checkedIn ? 'Checked in' : 'Mark present';
-      attendanceButton.setAttribute('aria-pressed', String(r.checkedIn === true));
-      attendanceButton.setAttribute('aria-label', (r.checkedIn ? 'Undo check-in for ' : 'Check in ') + (r.fullName || 'participant'));
+      attendanceButton.textContent = checkedInThisEvent ? 'Checked in' : 'Mark present';
+      attendanceButton.setAttribute('aria-pressed', String(checkedInThisEvent));
+      attendanceButton.setAttribute('aria-label', (checkedInThisEvent ? 'Undo check-in for ' : 'Check in ') + (r.fullName || 'participant') + ' on ' + activeEventDate);
       attendanceButton.addEventListener('click', async () => {
         attendanceButton.disabled = true;
         checkinError.style.display = 'none';
         try {
-          await db.collection('registrations').doc(r.id).update({
-            checkedIn: !r.checkedIn,
-            checkedInAt: !r.checkedIn ? firebase.firestore.FieldValue.serverTimestamp() : null
-          });
+          const recordId = activeEventDate + '_' + r.id;
+          await db.collection('eventAttendance').doc(recordId).set({
+            registrationId: r.id,
+            eventDate: activeEventDate,
+            checkedIn: !checkedInThisEvent,
+            checkedInAt: !checkedInThisEvent ? firebase.firestore.FieldValue.serverTimestamp() : null
+          }, { merge: true });
         } catch (err) {
           checkinError.textContent = 'Could not update attendance. Check the connection and Firestore permissions, then try again.';
           checkinError.style.display = 'block';
@@ -306,6 +363,7 @@
       });
       tdAttendance.appendChild(attendanceButton);
       tr.appendChild(tdAttendance);
+      tr.appendChild(cell(String(attendanceCounts.get(r.id) || 0), '', 'Total Saturdays'));
       tr.appendChild(cell(r.message === '—' ? '' : r.message, 'msg', 'Message'));
       tr.appendChild(cell(fmtDate(r.submittedAt), '', 'Signed up'));
       tbody.appendChild(tr);
@@ -320,9 +378,18 @@
       if (/^[=+\-@]/.test(t)) t = "'" + t;
       return '"' + t.replace(/"/g, '""') + '"';
     };
-    const head = ['Name','Phone','Email','Gender','City','Interest','Photo consent','Marketing updates','Checked in','Checked in at','Message','Signed up'];
+    const head = ['Name','Phone','Email','Gender','City','Interest','Photo consent','Marketing updates','Selected event date','Checked in this event','Total Saturdays attended','Checked in at','Message','Signed up'];
     const lines = [head.map(esc).join(',')];
-    filtered().forEach(r => lines.push([r.fullName, r.phone, r.email, r.gender, r.city, interestLabel[r.interest] || r.interest, r.photoConsent === true ? 'Yes' : r.photoConsent === false ? 'No' : 'Not recorded', r.marketingConsent === true ? 'Yes' : r.marketingConsent === false ? 'No' : 'Not recorded', r.checkedIn ? 'Yes' : 'No', fmtDate(r.checkedInAt), r.message, fmtDate(r.submittedAt)].map(esc).join(',')));
+    const currentEventAttendance = new Map(allAttendance.filter(a => a.checkedIn === true && a.eventDate === eventDateLabel()).map(a => [a.registrationId, a]));
+    const attendanceCounts = new Map();
+    allAttendance.filter(a => a.checkedIn === true).forEach(a => attendanceCounts.set(a.registrationId, (attendanceCounts.get(a.registrationId) || 0) + 1));
+    filtered().forEach(r => {
+      const record = currentEventAttendance.get(r.id);
+      lines.push([r.fullName, r.phone, r.email, r.gender, r.city, interestLabel[r.interest] || r.interest,
+        r.photoConsent === true ? 'Yes' : r.photoConsent === false ? 'No' : 'Not recorded',
+        r.marketingConsent === true ? 'Yes' : r.marketingConsent === false ? 'No' : 'Not recorded',
+        eventDateLabel(), record ? 'Yes' : 'No', attendanceCounts.get(r.id) || 0, fmtDate(record && record.checkedInAt), r.message, fmtDate(r.submittedAt)].map(esc).join(','));
+    });
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -338,6 +405,7 @@
   }
   $('backupBtn').addEventListener('click', () => {
     const sheet = $('backupPrint');
+    $('backupEventDate').textContent = eventDateLabel();
     sheet.setAttribute('aria-hidden', 'false');
     window.print();
     sheet.setAttribute('aria-hidden', 'true');
