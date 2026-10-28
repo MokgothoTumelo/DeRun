@@ -100,7 +100,6 @@
         <div class="stat"><b id="sTotal">0</b><span>Total signups</span></div>
         <div class="stat"><b id="sFemale">0</b><span>Female</span></div>
         <div class="stat"><b id="sMale">0</b><span>Male</span></div>
-        <div class="stat"><b id="sJoin">0</b><span>Want to join</span></div>
         <div class="stat"><b id="sAttended">0</b><span>Checked in this Saturday</span></div>
       </div>
 
@@ -301,7 +300,6 @@
     $('sTotal').textContent = all.length;
     $('sFemale').textContent = all.filter(r => r.gender === 'female').length;
     $('sMale').textContent = all.filter(r => r.gender === 'male').length;
-    $('sJoin').textContent = all.filter(r => r.interest === 'join').length;
     const activeEventDate = eventDateLabel();
     const attendanceForEvent = new Map();
     const attendanceCounts = new Map();
