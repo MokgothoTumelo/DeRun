@@ -349,6 +349,16 @@
       cursor: pointer;
     }
 
+    .path-options { display:grid; gap:.8rem; margin-top:1.2rem; }
+    .path-option { width:100%; padding:1rem; border:1.5px solid var(--border); border-radius:12px; background:#fff; color:var(--text); text-align:left; cursor:pointer; transition:border-color .2s, box-shadow .2s, transform .2s; }
+    .path-option:hover, .path-option:focus-visible { border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,114,219,.12); outline:none; }
+    .path-option strong { display:block; font-size:1rem; }
+    .path-option span { display:block; margin-top:.2rem; color:var(--muted); font-size:.86rem; font-weight:400; }
+    .back-button { margin-bottom:1rem; padding:.55rem .75rem; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--blue); font:inherit; font-weight:700; cursor:pointer; }
+    .form-subheading { margin:1.25rem 0 .65rem; font-size:.9rem; font-weight:800; }
+    .type-options { display:grid; gap:.6rem; }
+    .type-options .checkbox-group { margin-bottom:0; }
+
     /* Button */
     button[type="submit"] {
       width: 100%;
@@ -706,8 +716,24 @@
       </div>
     </div>
 
-    <!-- Signup form -->
-    <div class="card" id="formSection">
+    <section class="card" id="pathChooser">
+      <h2>How would you like to get involved?</h2>
+      <p>Choose the option that best fits you.</p>
+      <div class="path-options">
+        <button class="path-option" type="button" data-path="runner">
+          <strong>Join DE RUN</strong>
+          <span>Register as a participant or ask for more information.</span>
+        </button>
+        <button class="path-option" type="button" data-path="partner">
+          <strong>Partner with us</strong>
+          <span>Tell us how your organisation would like to support DE RUN.</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Runner registration path -->
+    <div class="card" id="formSection" style="display:none">
+      <button class="back-button" type="button" data-back>← Change selection</button>
       <h2>Register for DE RUN</h2>
       <p>Share your details to register your interest in DE RUN. We’ll use them to respond to your enquiry and help organise the community.</p>
 
@@ -778,6 +804,75 @@
       <div class="thank-you">
         <h2>Thanks for registering your interest.</h2>
         <p>Your details have been received. The DE LEGACY team will follow up with event information.</p>
+      </div>
+    </div>
+
+    <!-- Partnership enquiry path -->
+    <div class="card" id="partnershipSection" style="display:none">
+      <button class="back-button" type="button" data-back>← Change selection</button>
+      <h2>Partner with DE LEGACY / DE RUN</h2>
+      <p>Share your organisation’s details and how you’d like to be involved. The partnerships team will follow up with you.</p>
+      <div id="partnershipMessage" class="message" aria-live="polite"></div>
+      <form id="partnershipForm">
+        <div class="form-group">
+          <label for="organisationName">Organisation name *</label>
+          <input type="text" id="organisationName" name="organisationName" required maxlength="200" autocomplete="organization" />
+        </div>
+        <div class="form-group">
+          <label for="organisationCategory">Organisation category *</label>
+          <select id="organisationCategory" name="organisationCategory" required>
+            <option value="">Select a category</option>
+            <option value="sportswear">Sportswear / apparel</option>
+            <option value="refreshments">Refreshments / food</option>
+            <option value="running-club">Running club</option>
+            <option value="community">Community organisation</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="partnerContactName">Contact person *</label>
+          <input type="text" id="partnerContactName" name="contactName" required maxlength="200" autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label for="partnerEmail">Email *</label>
+          <input type="email" id="partnerEmail" name="contactEmail" required maxlength="200" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="partnerPhone">WhatsApp / phone *</label>
+          <input type="tel" id="partnerPhone" name="contactPhone" required maxlength="40" autocomplete="tel" inputmode="tel" />
+        </div>
+
+        <h3 class="form-subheading">How would you like to participate? *</h3>
+        <div class="type-options">
+          <div class="checkbox-group"><input type="checkbox" id="typeStand" name="participationType" value="promotional-stand" /><label for="typeStand">Promotional stand</label></div>
+          <div class="checkbox-group"><input type="checkbox" id="typeSampling" name="participationType" value="product-sampling" /><label for="typeSampling">Product sampling</label></div>
+          <div class="checkbox-group"><input type="checkbox" id="typeClub" name="participationType" value="running-club" /><label for="typeClub">Running club participation</label></div>
+          <div class="checkbox-group"><input type="checkbox" id="typeOther" name="participationType" value="other-support" /><label for="typeOther">Other support</label></div>
+        </div>
+        <div class="form-group" style="margin-top:1rem">
+          <label for="otherParticipation">If other, please describe</label>
+          <input type="text" id="otherParticipation" name="otherParticipation" maxlength="500" />
+        </div>
+        <div class="form-group">
+          <label for="spaceRequirements">Space requirements</label>
+          <textarea id="spaceRequirements" name="spaceRequirements" maxlength="1500" placeholder="For example, approximate space needed..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="equipmentNeeds">Equipment needed</label>
+          <textarea id="equipmentNeeds" name="equipmentNeeds" maxlength="1500" placeholder="Tables, power, shelter, or other equipment..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="logisticsNotes">Other event logistics</label>
+          <textarea id="logisticsNotes" name="logisticsNotes" maxlength="2000" placeholder="Set-up, timing, or other requirements..."></textarea>
+        </div>
+        <button type="submit" id="partnershipSubmit">Send partnership enquiry</button>
+      </form>
+    </div>
+
+    <div id="partnershipSuccess" class="card" aria-live="polite" tabindex="-1" style="display:none">
+      <div class="thank-you">
+        <h2>Thank you for reaching out.</h2>
+        <p>Your partnership enquiry has been received. The DE LEGACY team will follow up with you.</p>
       </div>
     </div>
 
@@ -860,6 +955,40 @@
     const formSection = document.getElementById('formSection');
     const successSection = document.getElementById('successSection');
     const announcementSection = document.getElementById('announcementSection');
+    const pathChooser = document.getElementById('pathChooser');
+    const partnershipSection = document.getElementById('partnershipSection');
+    const partnershipSuccess = document.getElementById('partnershipSuccess');
+    const partnershipForm = document.getElementById('partnershipForm');
+    const partnershipMessage = document.getElementById('partnershipMessage');
+    const partnershipSubmit = document.getElementById('partnershipSubmit');
+
+    document.querySelectorAll('[data-path]').forEach(button => {
+      button.addEventListener('click', () => {
+        pathChooser.style.display = 'none';
+        let activeSection;
+        let firstField;
+        if (button.dataset.path === 'runner') {
+          formSection.style.display = 'block';
+          activeSection = formSection;
+          firstField = document.getElementById('fullName');
+        } else {
+          partnershipSection.style.display = 'block';
+          activeSection = partnershipSection;
+          firstField = document.getElementById('organisationName');
+        }
+        activeSection.scrollIntoView({ behavior:'smooth', block:'start' });
+        firstField.focus({ preventScroll:true });
+      });
+    });
+
+    document.querySelectorAll('[data-back]').forEach(button => {
+      button.addEventListener('click', () => {
+        formSection.style.display = 'none';
+        partnershipSection.style.display = 'none';
+        pathChooser.style.display = 'block';
+        pathChooser.scrollIntoView({ behavior:'smooth', block:'start' });
+      });
+    });
 
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
@@ -938,11 +1067,68 @@
       }
     });
 
+    partnershipForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (!partnershipForm.checkValidity()) {
+        partnershipForm.reportValidity();
+        return;
+      }
+
+      const participationTypes = Array.from(partnershipForm.querySelectorAll('input[name="participationType"]:checked')).map(input => input.value);
+      if (!participationTypes.length) {
+        showPartnershipMessage('Choose at least one way your organisation would like to participate.', 'error');
+        return;
+      }
+      if (!db) {
+        showPartnershipMessage('The form is temporarily unavailable. Please try again later.', 'error');
+        return;
+      }
+
+      partnershipSubmit.disabled = true;
+      partnershipSubmit.textContent = 'Sending...';
+      partnershipMessage.style.display = 'none';
+
+      try {
+        await db.collection('partnerships').add({
+          organisationName: document.getElementById('organisationName').value.trim(),
+          category: document.getElementById('organisationCategory').value,
+          contactName: document.getElementById('partnerContactName').value.trim(),
+          contactEmail: document.getElementById('partnerEmail').value.trim(),
+          contactPhone: document.getElementById('partnerPhone').value.trim(),
+          participationTypes,
+          otherParticipation: document.getElementById('otherParticipation').value.trim(),
+          spaceRequirements: document.getElementById('spaceRequirements').value.trim(),
+          equipmentNeeds: document.getElementById('equipmentNeeds').value.trim(),
+          logisticsNotes: document.getElementById('logisticsNotes').value.trim(),
+          status: 'new',
+          followUpNotes: '',
+          submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        partnershipSection.style.display = 'none';
+        announcementSection.style.display = 'none';
+        partnershipSuccess.style.display = 'block';
+        partnershipSuccess.focus();
+        window.scrollTo({ top:0, behavior:'smooth' });
+      } catch (err) {
+        console.error('Partnership enquiry error:', err);
+        showPartnershipMessage('Your enquiry could not be saved. Please check your connection and try again.', 'error');
+        partnershipSubmit.disabled = false;
+        partnershipSubmit.textContent = 'Send partnership enquiry';
+      }
+    });
+
     function showMessage(text, type) {
       messageBox.textContent = text;
       messageBox.className = 'message ' + type;
       messageBox.style.display = 'block';
       messageBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function showPartnershipMessage(text, type) {
+      partnershipMessage.textContent = text;
+      partnershipMessage.className = 'message ' + type;
+      partnershipMessage.style.display = 'block';
+      partnershipMessage.scrollIntoView({ behavior:'smooth', block:'center' });
     }
   </script>
 </body>
