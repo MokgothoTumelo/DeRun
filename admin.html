@@ -45,6 +45,12 @@
     .empty { text-align:center; padding:2rem 1rem; color:var(--muted); }
     .checkin-toggle { min-height:38px; padding:.45rem .7rem; font-size:.82rem; white-space:nowrap; }
     .checkin-toggle[aria-pressed="true"] { background:#166534; }
+    .dashboard-tabs { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .dashboard-tabs button[aria-selected="true"] { background:var(--blue); }
+    .review-notes { min-width:220px; min-height:76px; }
+    .review-status { min-width:145px; }
+    .review-save { margin-top:.4rem; min-height:38px; padding:.45rem .7rem; font-size:.82rem; }
+    .partner-requirements { min-width:220px; white-space:pre-line; }
     #backupPrint { display:none; }
     #backupPrint h1 { margin-bottom:.4rem; }
     #backupPrint p { margin-bottom:1rem; }
@@ -96,6 +102,12 @@
 
     <!-- Dashboard -->
     <div id="dashView">
+      <div class="dashboard-tabs" role="tablist" aria-label="Admin sections">
+        <button type="button" id="participantsTab" role="tab" aria-selected="true" aria-controls="participantsPanel">Participants</button>
+        <button type="button" id="partnershipsTab" role="tab" aria-selected="false" aria-controls="partnershipsPanel">Partnerships</button>
+      </div>
+
+      <section id="participantsPanel" role="tabpanel" aria-labelledby="participantsTab">
       <div class="stats">
         <div class="stat"><b id="sTotal">0</b><span>Total signups</span></div>
         <div class="stat"><b id="sFemale">0</b><span>Female</span></div>
@@ -144,6 +156,33 @@
           <tbody id="backupRows"></tbody>
         </table>
       </section>
+      </section>
+
+      <section id="partnershipsPanel" role="tabpanel" aria-labelledby="partnershipsTab" style="display:none">
+        <div class="stats">
+          <div class="stat"><b id="pTotal">0</b><span>Total enquiries</span></div>
+          <div class="stat"><b id="pNew">0</b><span>New enquiries</span></div>
+        </div>
+        <div class="tools">
+          <input type="search" id="partnershipSearch" placeholder="Search organisation or contact…" />
+          <select id="partnershipStatusFilter" aria-label="Filter partnership enquiries by status">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="reviewing">Reviewing</option>
+            <option value="follow-up">Follow up</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+          </select>
+        </div>
+        <div class="error" id="partnershipError" role="alert"></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Organisation</th><th>Category</th><th>Contact</th><th>Participation</th><th>Requirements</th><th>Submitted</th><th>Review status</th><th>Private follow-up notes</th><th>Action</th></tr></thead>
+            <tbody id="partnershipRows"></tbody>
+          </table>
+          <div class="empty" id="partnershipEmpty" style="display:none">No partnership enquiries yet.</div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -167,12 +206,23 @@
   const $ = id => document.getElementById(id);
   let all = [];
   let allAttendance = [];
+  let allPartnerships = [];
   let unsubscribeRegistrations = null;
   let unsubscribeAttendance = null;
+  let unsubscribePartnerships = null;
 
   const interestLabel = { join: 'Joining DE RUN', info: 'More information' };
+  const participationLabel = {
+    'promotional-stand': 'Promotional stand',
+    'product-sampling': 'Product sampling',
+    'running-club': 'Running club participation',
+    'other-support': 'Other support'
+  };
+  const partnershipStatuses = ['new', 'reviewing', 'follow-up', 'approved', 'declined'];
+  const partnershipStatusLabels = { new:'New', reviewing:'Reviewing', 'follow-up':'Follow up', approved:'Approved', declined:'Declined' };
   const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
   const checkinError = $('checkinError');
+  const partnershipError = $('partnershipError');
   const dateKey = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
   function nextSaturday() {
     const date = new Date();
@@ -191,6 +241,20 @@
     checkinError.textContent = message;
     checkinError.style.display = 'block';
   }
+  function showPartnershipError(message) {
+    partnershipError.textContent = message;
+    partnershipError.style.display = 'block';
+  }
+
+  function showAdminPanel(panel) {
+    const showPartnerships = panel === 'partnerships';
+    $('participantsPanel').style.display = showPartnerships ? 'none' : 'block';
+    $('partnershipsPanel').style.display = showPartnerships ? 'block' : 'none';
+    $('participantsTab').setAttribute('aria-selected', String(!showPartnerships));
+    $('partnershipsTab').setAttribute('aria-selected', String(showPartnerships));
+  }
+  $('participantsTab').addEventListener('click', () => showAdminPanel('participants'));
+  $('partnershipsTab').addEventListener('click', () => showAdminPanel('partnerships'));
 
   function toWaLink(phone) {
     let d = String(phone || '').replace(/\D/g, '');
@@ -252,21 +316,37 @@
           showCheckinError('Could not load attendance history. Check the Firestore rules for this admin account.');
         });
       }
+      if (!unsubscribePartnerships) {
+        unsubscribePartnerships = db.collection('partnerships').orderBy('submittedAt', 'desc').onSnapshot(snap => {
+          allPartnerships = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+          renderPartnerships();
+        }, err => {
+          console.error(err);
+          showPartnershipError(err && err.code === 'permission-denied'
+            ? 'Firebase denied access to partnership enquiries. Check the deployed Firestore rules.'
+            : 'Could not load partnership enquiries.');
+        });
+      }
       $('loginView').style.display = 'none';
       $('dashView').style.display = 'block';
       $('logoutBtn').style.display = 'inline-flex';
     } else {
       if (unsubscribeRegistrations) unsubscribeRegistrations();
       if (unsubscribeAttendance) unsubscribeAttendance();
+      if (unsubscribePartnerships) unsubscribePartnerships();
       unsubscribeRegistrations = null;
       unsubscribeAttendance = null;
+      unsubscribePartnerships = null;
       all = [];
       allAttendance = [];
+      allPartnerships = [];
       $('loginView').style.display = 'block';
       $('dashView').style.display = 'none';
       $('logoutBtn').style.display = 'none';
     }
   });
+  $('partnershipSearch').addEventListener('input', renderPartnerships);
+  $('partnershipStatusFilter').addEventListener('change', renderPartnerships);
 
   $('eventDate').addEventListener('change', () => {
     checkinError.style.display = 'none';
@@ -364,6 +444,91 @@
       tr.appendChild(cell(String(attendanceCounts.get(r.id) || 0), '', 'Total Saturdays'));
       tr.appendChild(cell(r.message === '—' ? '' : r.message, 'msg', 'Message'));
       tr.appendChild(cell(fmtDate(r.submittedAt), '', 'Signed up'));
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderPartnerships() {
+    $('pTotal').textContent = allPartnerships.length;
+    $('pNew').textContent = allPartnerships.filter(p => !p.status || p.status === 'new').length;
+    const query = $('partnershipSearch').value.trim().toLowerCase();
+    const statusFilter = $('partnershipStatusFilter').value;
+    const list = allPartnerships.filter(p => {
+      const text = [p.organisationName, p.category, p.contactName, p.contactEmail, p.contactPhone].join(' ').toLowerCase();
+      return (!statusFilter || (p.status || 'new') === statusFilter) && (!query || text.includes(query));
+    });
+    const tbody = $('partnershipRows');
+    tbody.innerHTML = '';
+    $('partnershipEmpty').style.display = list.length ? 'none' : 'block';
+    $('partnershipEmpty').textContent = allPartnerships.length ? 'No enquiries match this search or status.' : 'No partnership enquiries yet.';
+
+    list.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.appendChild(cell(p.organisationName, '', 'Organisation'));
+      tr.appendChild(cell(p.category, '', 'Category'));
+      const contact = document.createElement('td');
+      contact.setAttribute('data-l', 'Contact');
+      contact.textContent = [p.contactName, p.contactEmail, p.contactPhone].filter(Boolean).join('\n') || '—';
+      contact.style.whiteSpace = 'pre-line';
+      tr.appendChild(contact);
+      tr.appendChild(cell((p.participationTypes || []).map(type => participationLabel[type] || type).join(', '), '', 'Participation'));
+      const requirements = [
+        p.otherParticipation ? 'Other: ' + p.otherParticipation : '',
+        p.spaceRequirements ? 'Space: ' + p.spaceRequirements : '',
+        p.equipmentNeeds ? 'Equipment: ' + p.equipmentNeeds : '',
+        p.logisticsNotes ? 'Logistics: ' + p.logisticsNotes : ''
+      ].filter(Boolean).join('\n');
+      const requirementsCell = cell(requirements, 'partner-requirements', 'Requirements');
+      tr.appendChild(requirementsCell);
+      tr.appendChild(cell(fmtDate(p.submittedAt), '', 'Submitted'));
+
+      const statusCell = document.createElement('td');
+      statusCell.setAttribute('data-l', 'Review status');
+      const statusSelect = document.createElement('select');
+      statusSelect.className = 'review-status';
+      statusSelect.setAttribute('aria-label', 'Review status for ' + (p.organisationName || 'partnership enquiry'));
+      partnershipStatuses.forEach(status => {
+        const option = document.createElement('option');
+        option.value = status;
+        option.textContent = partnershipStatusLabels[status];
+        statusSelect.appendChild(option);
+      });
+      statusSelect.value = partnershipStatuses.includes(p.status) ? p.status : 'new';
+      statusCell.appendChild(statusSelect);
+      tr.appendChild(statusCell);
+
+      const notesCell = document.createElement('td');
+      notesCell.setAttribute('data-l', 'Private follow-up notes');
+      const notes = document.createElement('textarea');
+      notes.className = 'review-notes';
+      notes.maxLength = 3000;
+      notes.value = p.followUpNotes || '';
+      notes.setAttribute('aria-label', 'Private follow-up notes for ' + (p.organisationName || 'partnership enquiry'));
+      notesCell.appendChild(notes);
+      tr.appendChild(notesCell);
+
+      const actionCell = document.createElement('td');
+      actionCell.setAttribute('data-l', 'Action');
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'review-save';
+      save.textContent = 'Save review';
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        partnershipError.style.display = 'none';
+        try {
+          await db.collection('partnerships').doc(p.id).update({
+            status: statusSelect.value,
+            followUpNotes: notes.value.trim()
+          });
+        } catch (err) {
+          console.error('Partnership review save failed:', err);
+          showPartnershipError('Could not save review details. Check the connection and deployed Firestore rules.');
+          save.disabled = false;
+        }
+      });
+      actionCell.appendChild(save);
+      tr.appendChild(actionCell);
       tbody.appendChild(tr);
     });
   }
