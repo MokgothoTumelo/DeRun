@@ -418,7 +418,7 @@
       border: 1px solid #fecaca;
     }
 
-    /* Success / Poster section (shown after registration) */
+    /* Confirmation shown after registration */
     #successSection {
       display: none;
     }
@@ -708,8 +708,8 @@
 
     <!-- Signup form -->
     <div class="card" id="formSection">
-      <h2>Join DE RUN</h2>
-      <p>Sign up below and be part of the movement.</p>
+      <h2>Register for DE RUN</h2>
+      <p>Share your details to register your interest in DE RUN. We’ll use them to respond to your enquiry and help organise the community.</p>
 
       <div id="formMessage" class="message" aria-live="polite"></div>
 
@@ -759,53 +759,25 @@
         </div>
 
         <div class="checkbox-group">
-          <input type="checkbox" id="marketingConsent" name="marketingConsent" required />
-          <label for="marketingConsent">I agree to receive updates and marketing communications from DE LEGACY.</label>
+          <input type="checkbox" id="photoConsent" name="photoConsent" />
+          <label for="photoConsent">I’m happy for DE LEGACY to photograph or record me at DE RUN and use those images in its community updates. This is optional and won’t affect my registration.</label>
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="marketingConsent" name="marketingConsent" />
+          <label for="marketingConsent">I’d like to receive future updates and marketing communications from DE LEGACY. This is optional and won’t affect my registration.</label>
         </div>
 
         <button type="submit" id="submitBtn">Submit</button>
+        <p class="hint">If you cannot register online, please sign up with the team at the DE RUN event.</p>
       </form>
     </div>
 
-    <!-- Success + Poster (shown only after successful registration) -->
-    <div id="successSection">
+    <!-- Confirmation shown after a registration is saved -->
+    <div id="successSection" aria-live="polite" tabindex="-1">
       <div class="thank-you">
-        <h2>You’re in! 🎉</h2>
-        <p>Thank you for joining DE RUN. Here’s what’s waiting for you:</p>
-      </div>
-
-      <div class="poster">
-        <div class="poster-inner">
-          <div class="poster-item">
-            <div class="poster-label"><span class="bar-blue"></span>Full</div>
-            <div class="poster-title">
-              Refreshments
-              <span class="bar-pink"></span>
-            </div>
-          </div>
-
-          <div class="poster-divider"></div>
-
-          <div class="poster-item">
-            <div class="poster-label"><span class="bar-blue"></span>Surprise</div>
-            <div class="poster-title">
-              Guest
-              <span class="bar-pink"></span>
-            </div>
-          </div>
-
-          <div class="poster-divider"></div>
-
-          <div class="poster-item">
-            <div class="poster-label"><span class="bar-blue"></span>Winner Get</div>
-            <div class="poster-title">
-              Free Hair Cut
-              <span class="bar-pink"></span>
-            </div>
-            <div class="poster-sub">And Nail Appointment</div>
-          </div>
-        </div>
-        <div class="poster-accent"></div>
+        <h2>Thanks for registering your interest.</h2>
+        <p>Your details have been received. The DE LEGACY team will follow up with event information.</p>
       </div>
     </div>
 
@@ -895,15 +867,14 @@
       const name = document.getElementById('fullName').value.trim();
       const phone = document.getElementById('phone').value.trim();
       const email = document.getElementById('email').value.trim();
-      const consent = document.getElementById('marketingConsent').checked;
 
       if (!name || !phone || !email) {
         showMessage('Please fill in your name, phone number and email.', 'error');
         return;
       }
 
-      if (!consent) {
-        showMessage('Please agree to receive updates to continue.', 'error');
+      if (!form.checkValidity()) {
+        form.reportValidity();
         return;
       }
 
@@ -920,7 +891,8 @@
         interest: document.getElementById('interest').value || 'Not specified',
         message: document.getElementById('message').value.trim() || '—',
         campaign: 'DE RUN',
-        marketingConsent: 'Yes',
+        marketingConsent: document.getElementById('marketingConsent').checked,
+        photoConsent: document.getElementById('photoConsent').checked,
         submittedAt: new Date().toISOString()
       };
 
@@ -940,7 +912,9 @@
           interest: formData.interest,
           message: formData.message,
           campaign: formData.campaign,
-          marketingConsent: true,
+          marketingConsent: formData.marketingConsent,
+          photoConsent: formData.photoConsent,
+          checkedIn: false,
           submittedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -955,6 +929,7 @@
         formSection.style.display = 'none';
         announcementSection.style.display = 'none';
         successSection.style.display = 'block';
+        successSection.focus();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         console.error('Registration error:', err);

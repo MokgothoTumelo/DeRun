@@ -43,6 +43,25 @@
     .wa { color:var(--blue); font-weight:700; text-decoration:none; }
     .msg { max-width:240px; color:var(--muted); }
     .empty { text-align:center; padding:2rem 1rem; color:var(--muted); }
+    .checkin-toggle { min-height:38px; padding:.45rem .7rem; font-size:.82rem; white-space:nowrap; }
+    .checkin-toggle[aria-pressed="true"] { background:#166534; }
+    #backupPrint { display:none; }
+    #backupPrint h1 { margin-bottom:.4rem; }
+    #backupPrint p { margin-bottom:1rem; }
+    #backupPrint table { width:100%; border-collapse:collapse; }
+    #backupPrint th, #backupPrint td { border:1px solid #333; padding:.45rem; text-align:left; }
+    #backupPrint td { height:2.1rem; }
+    @media print {
+      body * { visibility:hidden !important; }
+      #backupPrint, #backupPrint * { visibility:visible !important; }
+      #backupPrint { display:block !important; position:absolute; inset:0; width:100%; padding:1rem; color:#000; background:#fff; }
+      #backupPrint table { display:table !important; }
+      #backupPrint thead { display:table-header-group !important; }
+      #backupPrint tbody { display:table-row-group !important; }
+      #backupPrint tr { display:table-row !important; }
+      #backupPrint th, #backupPrint td { display:table-cell !important; width:auto !important; }
+      @page { size:landscape; margin:12mm; }
+    }
     @media (max-width:699px) {
       .table-scroll { background:none; border:none; padding:0; overflow:visible; }
       table, tbody, tr, td { display:block; width:100%; }
@@ -82,6 +101,7 @@
         <div class="stat"><b id="sFemale">0</b><span>Female</span></div>
         <div class="stat"><b id="sMale">0</b><span>Male</span></div>
         <div class="stat"><b id="sJoin">0</b><span>Want to join</span></div>
+        <div class="stat"><b id="sAttended">0</b><span>Checked in</span></div>
       </div>
 
       <div class="tools">
@@ -97,17 +117,29 @@
           <option value="info">More information</option>
         </select>
         <button id="csvBtn" class="btn-light">Export CSV</button>
+        <button id="backupBtn" class="btn-light">Print offline backup sheet</button>
       </div>
+
+      <div class="error" id="checkinError" role="alert"></div>
 
       <div class="table-scroll">
         <table>
           <thead>
-            <tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Gender</th><th>City</th><th>Interest</th><th>Message</th><th>Signed up</th></tr>
+            <tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Gender</th><th>City</th><th>Interest</th><th>Photo consent</th><th>Marketing updates</th><th>Attendance</th><th>Message</th><th>Signed up</th></tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
         <div class="empty" id="empty" style="display:none">No signups yet.</div>
       </div>
+
+      <section id="backupPrint" aria-hidden="true">
+        <h1>DE RUN — Offline Registration &amp; Check-in</h1>
+        <p>Use this sheet only if the online form is unavailable. Ask each person separately about photography and marketing; mark Yes only when they choose to opt in. Enter these registrations online when service is restored.</p>
+        <table>
+          <thead><tr><th>Name</th><th>WhatsApp / Phone</th><th>Email</th><th>Interest (join/info)</th><th>Photo consent (Y/N)</th><th>Marketing consent (Y/N)</th><th>Checked in</th></tr></thead>
+          <tbody id="backupRows"></tbody>
+        </table>
+      </section>
     </div>
   </div>
 
@@ -134,6 +166,7 @@
 
   const interestLabel = { join: 'Joining DE RUN', info: 'More information' };
   const cap = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  const checkinError = $('checkinError');
 
   function toWaLink(phone) {
     let d = String(phone || '').replace(/\D/g, '');
@@ -225,6 +258,7 @@
     $('sFemale').textContent = all.filter(r => r.gender === 'female').length;
     $('sMale').textContent = all.filter(r => r.gender === 'male').length;
     $('sJoin').textContent = all.filter(r => r.interest === 'join').length;
+    $('sAttended').textContent = all.filter(r => r.checkedIn === true).length;
 
     const list = filtered();
     const tbody = $('rows');
@@ -246,6 +280,32 @@
       tr.appendChild(cell(cap(r.gender === 'Not specified' ? '' : r.gender), '', 'Gender'));
       tr.appendChild(cell(r.city === 'Not specified' ? '' : r.city, '', 'City'));
       tr.appendChild(cell(interestLabel[r.interest] || '', '', 'Interest'));
+      tr.appendChild(cell(r.photoConsent === true ? 'Yes' : r.photoConsent === false ? 'No' : 'Not recorded', '', 'Photo consent'));
+      tr.appendChild(cell(r.marketingConsent === true ? 'Yes' : r.marketingConsent === false ? 'No' : 'Not recorded', '', 'Marketing updates'));
+      const tdAttendance = document.createElement('td');
+      tdAttendance.setAttribute('data-l', 'Attendance');
+      const attendanceButton = document.createElement('button');
+      attendanceButton.type = 'button';
+      attendanceButton.className = 'checkin-toggle';
+      attendanceButton.textContent = r.checkedIn ? 'Checked in' : 'Mark present';
+      attendanceButton.setAttribute('aria-pressed', String(r.checkedIn === true));
+      attendanceButton.setAttribute('aria-label', (r.checkedIn ? 'Undo check-in for ' : 'Check in ') + (r.fullName || 'participant'));
+      attendanceButton.addEventListener('click', async () => {
+        attendanceButton.disabled = true;
+        checkinError.style.display = 'none';
+        try {
+          await db.collection('registrations').doc(r.id).update({
+            checkedIn: !r.checkedIn,
+            checkedInAt: !r.checkedIn ? firebase.firestore.FieldValue.serverTimestamp() : null
+          });
+        } catch (err) {
+          checkinError.textContent = 'Could not update attendance. Check the connection and Firestore permissions, then try again.';
+          checkinError.style.display = 'block';
+          attendanceButton.disabled = false;
+        }
+      });
+      tdAttendance.appendChild(attendanceButton);
+      tr.appendChild(tdAttendance);
       tr.appendChild(cell(r.message === '—' ? '' : r.message, 'msg', 'Message'));
       tr.appendChild(cell(fmtDate(r.submittedAt), '', 'Signed up'));
       tbody.appendChild(tr);
@@ -260,15 +320,27 @@
       if (/^[=+\-@]/.test(t)) t = "'" + t;
       return '"' + t.replace(/"/g, '""') + '"';
     };
-    const head = ['Name','Phone','Email','Gender','City','Interest','Message','Signed up'];
+    const head = ['Name','Phone','Email','Gender','City','Interest','Photo consent','Marketing updates','Checked in','Checked in at','Message','Signed up'];
     const lines = [head.map(esc).join(',')];
-    filtered().forEach(r => lines.push([r.fullName, r.phone, r.email, r.gender, r.city, interestLabel[r.interest] || r.interest, r.message, fmtDate(r.submittedAt)].map(esc).join(',')));
+    filtered().forEach(r => lines.push([r.fullName, r.phone, r.email, r.gender, r.city, interestLabel[r.interest] || r.interest, r.photoConsent === true ? 'Yes' : r.photoConsent === false ? 'No' : 'Not recorded', r.marketingConsent === true ? 'Yes' : r.marketingConsent === false ? 'No' : 'Not recorded', r.checkedIn ? 'Yes' : 'No', fmtDate(r.checkedInAt), r.message, fmtDate(r.submittedAt)].map(esc).join(',')));
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'de-run-signups.csv';
     a.click();
     URL.revokeObjectURL(a.href);
+  });
+
+  for (let i = 0; i < 12; i++) {
+    const row = document.createElement('tr');
+    for (let j = 0; j < 7; j++) row.appendChild(document.createElement('td'));
+    $('backupRows').appendChild(row);
+  }
+  $('backupBtn').addEventListener('click', () => {
+    const sheet = $('backupPrint');
+    sheet.setAttribute('aria-hidden', 'false');
+    window.print();
+    sheet.setAttribute('aria-hidden', 'true');
   });
 </script>
 </body>
